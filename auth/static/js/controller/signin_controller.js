@@ -1,7 +1,13 @@
 var Controller = function(model, view, authToken) {
     this.model = model;
     this.view = view;
-    this.mainUrl = "main.html";
+
+    let redirect64 = (new URLSearchParams(window.location.search)).get('redirect');
+    if (redirect64) {
+        this.mainUrl = atob(redirect64);
+    } else {
+        this.mainUrl = "main.html";
+    }
 
     this.poolData = {
         UserPoolId: _config.cognito.userPoolId,
