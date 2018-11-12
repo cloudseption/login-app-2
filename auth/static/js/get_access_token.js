@@ -51,8 +51,8 @@ $(function () {
     })
     .then(function returnUserViaRedirect(jsonResponse) {
         let accessToken = jsonResponse.accesstoken;
-        let accessToken64 = btoa(JSON.stringify(accessToken));
-        let tokenParam = `token=${accessToken64}`;
+        console.log(accessToken);
+        let tokenParam = `token=${accessToken}`;
         
         let redirect64 = (new URLSearchParams(document.location.search)).get('redirect');
         if (!redirect64) {

@@ -1,54 +1,80 @@
-const crypto = require('crypto');
+const jose = require('node-jose');
+const keystore = require('./keystore');
 const CognitoExpress = require('cognito-express');
+
 const cognitoExpress = new CognitoExpress({
     region: 'us-west-2',
     cognitoUserPoolId: 'us-west-2_eZyNHvuo4',
     tokenUse: 'id'
 })
 
-const getClientSecretFromDb = function getClientSecretFromDb(clientAppKey) {
-    return 'asdfawexcv23rasdf';
-};
+const TOKEN_LIFESPAN = 3600000;
 
-const buildUserAccessTokenMsg = function buildUserAccessTokenMsg(cognitoResponse) {
-    return {
-        uuid: cognitoResponse.sub,
-        email: cognitoResponse.email
-    };
-};
+const handleRequest = function handleRequest(req, res) {
+    (new Promise(function validateCognitoToken(resolve, reject) {
+        let cognitoToken = req.headers.cognitoaccesstoken;
+        if (!cognitoToken) {
+            reject(new Error('Access token missing from header'));
+        }
+        cognitoExpress.validate(
+            cognitoToken,
+            function generateAppAccessToken(err, response) {
+                if (err) {
+                    reject(new Error('Error validating cognito token'));
+                }
+                resolve(response);
+            });
+    }))
 
-const genSignedAccessToken = function genSignedAccessToken(key, secret, message) {
-    let hmac = crypto.createHmac('sha256', secret);
-    hmac.update(message.toString());
-    let signature = hmac.digest('hex');
-    
-    return {
-        publicKey: key,
-        signature: signature,
-        message: message
-    };
-};
 
-const generateToken = function(req, res) {
-    let cognitoToken = req.headers.cognitoaccesstoken;
-    let clientAppKey = req.headers.clientappkey;
-    let clientAppSecret = getClientSecretFromDb(clientAppKey);
+    .then(function buildJwtPayload(cognitoResponse) {
+        return {
+            sub: cognitoResponse.sub,
+            email: cognitoResponse.email,
+            iat: Date.now(),
+            exp: Date.now() + TOKEN_LIFESPAN
+        };
+    })
 
-    if (!cognitoToken) {
-        return res.status(401).send("Access Token missing from header");
-    }
- 
-    cognitoExpress.validate(cognitoToken,
-        function generateAppAccessToken(err, response) {
-            if (err) {
-                return res.status(401).send(err);
+
+    .then(function getJwkForApp(jwtPayload) {
+        return {
+            payload: jwtPayload,
+            secret: keystore.getKeyForApp(req.headers.clientappkey)
+        };
+    })
+
+
+    .then(function signJwt(params) {
+        return jose.JWS.createSign(
+            {
+                fields: {
+                    alg: 'HS256',
+                    typ: 'jwt'
+                },
+                format: 'compact' },
+            {
+                key: params.secret
             }
-            
-            let idMsg = buildUserAccessTokenMsg(response);
-            let token = genSignedAccessToken(clientAppKey, clientAppSecret, idMsg);
-
-            res.send({ accesstoken: token });
+        )
+        .update(JSON.stringify(params.payload))
+        .final()
+        .then(jws => {
+            console.log(jws);
+            return jws;
         });
-};
+    })
 
-module.exports = generateToken;
+
+    .then(function returnJws(jws) {
+        return res.send({ accesstoken: jws });
+    })
+    
+
+    .catch(err => {
+        console.log(err);
+        return res.status(401).send(err.message);
+    });
+}
+
+module.exports = handleRequest;
