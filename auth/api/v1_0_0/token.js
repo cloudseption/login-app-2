@@ -1,5 +1,5 @@
 const jose = require('node-jose');
-const keystore = require('./keystore');
+const keystore = require('./authDataSingleton').keystore;
 const CognitoExpress = require('cognito-express');
 
 const cognitoExpress = new CognitoExpress({

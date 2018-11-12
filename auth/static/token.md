@@ -53,3 +53,52 @@ On your application's server, you should:
 2. Verify that the token has not been tampered with by using your application's secret to hash the signature, and compare the results (your crypto library almost certainly provides a function for this).
 3. (Not yet impelemented: Check the expirey time to make sure it hasn't expired. If it has, reject and have the user go authenticate again via the same redirect process)
 4. Continue, knowing the person who originally generated that token matches the user ID encoded in the token (use the UUID as the 'BadgeBookId').
+
+## Extracting token on Client Web Apps
+
+```
+const PUBLIC_KEY   = 'your-app-public-key';
+const REDIRECT_URL = `http://localhost:8080/auth/token.html?clientappkey=${PUBLIC_KEY}`;
+
+/*
+ * Pull token from query params and reload
+ */
+(function extractTokenFromQueryParam() {
+    let url = new URL(window.location);
+    if (url.searchParams.has('token')) {
+        let token = url.searchParams.get('token');
+        window.sessionStorage.setItem('token', token);
+        url.searchParams.delete('token');
+
+        window.location = url.toLocaleString();
+    }
+})();
+
+
+/*
+ * Renew expired tokens by going back to BadgeBook.
+ */
+(function renewExpiredToken() {
+    let token = window.sessionStorage.getItem('token');
+    if (token && JSON.parse(atob(token.split('.')[1])).exp < Date.now()) {
+        loginWithBadgeBook()
+    }
+})();
+
+
+/*
+ * Call to have the user log in with BadgeBook and return with an access token.
+ */
+function loginWithBadgeBook() {
+    let currentUrl  = btoa(window.location);
+    window.location = REDIRECT_URL + `&redirect=${currentUrl}`;
+}
+
+
+/*
+ * Helper for grabbing the current token
+ */
+window.getToken = function() {
+    return window.sessionStorage.getItem('token');
+}
+```
