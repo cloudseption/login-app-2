@@ -40,7 +40,7 @@ const handleRequest = function handleRequest(req, res) {
     .then(function getJwkForApp(jwtPayload) {
         return {
             payload: jwtPayload,
-            secret: keystore.getKeyForApp(req.headers.clientappkey)
+            secret: keystore.get(req.headers.clientappkey)
         };
     })
 
